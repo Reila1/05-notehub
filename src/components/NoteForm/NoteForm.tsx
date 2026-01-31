@@ -1,5 +1,7 @@
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createNote } from '../../services/noteService';
 import { NoteTag } from '../../types/note';
 import css from './NoteForm.module.css';
 
@@ -10,8 +12,7 @@ interface NoteFormValues {
 }
 
 interface NoteFormProps {
-  onSubmit: (values: NoteFormValues) => void;
-  onCancel: () => void;
+  onClose: () => void;
 }
 
 const validationSchema = Yup.object({
@@ -20,7 +21,17 @@ const validationSchema = Yup.object({
   tag: Yup.string().oneOf(['Todo', 'Work', 'Personal', 'Meeting', 'Shopping']).required()
 });
 
-export default function NoteForm({ onSubmit, onCancel }: NoteFormProps) {
+export default function NoteForm({ onClose }: NoteFormProps) {
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: createNote,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      onClose();
+    }
+  });
+
   const initialValues: NoteFormValues = {
     title: '',
     content: '',
@@ -31,7 +42,7 @@ export default function NoteForm({ onSubmit, onCancel }: NoteFormProps) {
     <Formik
       initialValues={initialValues}
       validationSchema={validationSchema}
-      onSubmit={onSubmit}
+      onSubmit={(values) => createMutation.mutate(values)}
     >
       {({ isSubmitting }) => (
         <Form className={css.form}>
@@ -60,10 +71,14 @@ export default function NoteForm({ onSubmit, onCancel }: NoteFormProps) {
           </div>
 
           <div className={css.actions}>
-            <button type="submit" className={css.submitButton} disabled={isSubmitting}>
+            <button 
+              type="submit" 
+              className={css.submitButton} 
+              disabled={isSubmitting || createMutation.isPending}
+            >
               Create note
             </button>
-            <button type="button" className={css.cancelButton} onClick={onCancel}>
+            <button type="button" className={css.cancelButton} onClick={onClose}>
               Cancel
             </button>
           </div>
